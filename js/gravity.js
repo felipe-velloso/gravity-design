@@ -1,11 +1,6 @@
 // Gravity.js
 // Responsive framework for intuitive and easy web design
 
-// ---------------------------------
-// ---------- Plugin Name ----------
-// ---------------------------------
-// Brief plugin description
-// ------------------------
 
 /*
     The semi-colon before the function invocation is a safety net against
@@ -119,21 +114,64 @@
                 the plugin. Cached variables can then be used in other methods. 
             */
             this.$element = $(this.element); console.log(this.$element);
+            this.$element.addClass('gravity-init');
+
+            var options = this.options;
+            var parents = 0;
+            this.$element.find('.gravity').each(function(index,element){
+                var parent = $(element).parent();
+                parent.addClass('gravity-parent');
+                $(element).attr('gravity-id',index);
+                if(parent.attr('gravity-id')===undefined){
+                    parent.attr('gravity-id',parents);
+                    options.elements.push({
+                        parent: '.gravity-parent[gravity-id='+parents+']',
+                        children: []
+                    });
+                    if(parents>0) parents += 1;
+                }
+                options.elements[parents].children.push('.gravity[gravity-id='+index+']');
+            });
+            this.options = options;
         },
         calcGravity: function () {
-
+            var options = this.options;
             // calc force todo
 
             // calc position
-            var top, right, bottom, left;
+            $.each(this.options.elements, function(index,parent){
+                $.each(parent.children, function(index,element){
+                    //var top, right, bottom, left;
+                    var ph = $(element).parent().outerHeight();
+                    var height = $(element).outerHeight();
+                    var margin = $(element).outerHeight()*options.k;
 
-            top = '';
-            this.$element.css({
-            	'position': 'absolute',
-	        	'top': this._defaults.force
-        	});
+                    // apply deafult margin
+                    $(element).css({
+        	        	'margin-top': margin+'px',
+                        'margin-bottom': margin+'px'
+                	});
 
-            console.log(this._defaults.force);
+                    // if margin exceeds available container, reduce
+                    if(height+(margin*2)>ph){
+                        margin = (ph-height)/2;
+                        $(element).css({
+                            'margin-top': margin+'px',
+                            'margin-bottom': margin+'px'
+                        });
+                    }
+
+                    // if margin to bounds is less apply default
+                    if($(element).offset().left<margin){
+                        $(element).css({
+                            'margin-left': margin+'px'
+                        });
+                    }
+
+                });
+            });
+
+            console.log(this.options);
 
         },
 
@@ -246,8 +284,14 @@
         More: http://learn.jquery.com/plugins/advanced-plugin-concepts/
     */
     $.fn.gravity.defaults = {
+        k: 0.618,
         force: 10,
+        elements: [],
         onComplete: null
     };
+
+    if($('.gravity').length){
+        $('body').gravity();
+    }
 
 })( jQuery, window, document );

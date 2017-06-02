@@ -1,2 +1,13 @@
 /* gravity.css */
 
+body {
+    height: 100%;
+    position: absolute !important;
+    top: 0;
+    margin: 0;
+    width: 100%;
+}
+
+.gravity, .gravity-parent {
+    position: relative;
+}
