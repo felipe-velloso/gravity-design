@@ -80,9 +80,10 @@
                 the "Plugin" constructor function (as shown in the buildCache
                 method below).
             */
+            this.setGravitation();
             this.buildCache();
             this.calcGravity();
-            this.bindEvents();
+            // this.bindEvents();
         },
 
         // Remove plugin instance completely
@@ -105,6 +106,17 @@
             this.$element.removeData();
         },
 
+        // Add default gravitation force
+        setGravitation: function () {
+            var $root = $(this.element);
+            $.each(this.options.gravitation, function(index,node){
+                $root.append('<div class="gravitation-node" gravity-id="'+node.name+'"></div>').find('.gravitation-node[gravity-id="'+node.name+'"]').css({
+                    top: node.top,
+                    left: node.left
+                });
+            });
+        },
+
         // Cache DOM nodes for performance
         buildCache: function () {
             /*
@@ -113,7 +125,7 @@
                 will cache a jQuery reference to the elementthat initialized
                 the plugin. Cached variables can then be used in other methods. 
             */
-            this.$element = $(this.element); console.log(this.$element);
+            this.$element = $(this.element); 
             this.$element.addClass('gravity-init');
 
             var options = this.options;
@@ -130,48 +142,128 @@
                     });
                     if(parents>0) parents += 1;
                 }
-                options.elements[parents].children.push('.gravity[gravity-id='+index+']');
+                options.elements[parents].children.push({ id: '.gravity[gravity-id='+index+']' });
             });
             this.options = options;
         },
         calcGravity: function () {
             var options = this.options;
-            // calc force todo
 
-            // calc position
-            $.each(this.options.elements, function(index,parent){
-                $.each(parent.children, function(index,element){
+            // store position data
+            $.each(this.options.elements, function(index,group){
+                group.data = {
+                    aWidth: $(group.parent).outerWidth(),
+                    aHeight: $(group.parent).outerHeight(),
+                    gWidth: 0,
+                    gHeight: 0,
+                    offset: {
+                        top: $(group.parent).offset().top,
+                        left: $(group.parent).offset().left
+                    }
+                };
+                group.data.gravity = {
+                    top: $('.gravity-init .gravitation-node').offset().top,
+                    left: $('.gravity-init .gravitation-node').offset().left
+                }
+
+                $.each(group.children, function(index,child){
                     //var top, right, bottom, left;
-                    var ph = $(element).parent().outerHeight();
-                    var height = $(element).outerHeight();
-                    var margin = $(element).outerHeight()*options.k;
+                    child.data = {
+                        width: $(child.id).outerWidth(),
+                        height: $(child.id).outerHeight()
+                    }
+                    child.data.force = (child.data.height*options.k);
+                    child.data.center = { 
+                        top: $(child.id).offset().top+(child.data.height/2), 
+                        left: $(child.id).offset().left+(child.data.width/2) 
+                    }
+                    child.data.margin = {
+                        top: parseInt($(child.id).css('margin-top'))/options.density*child.data.force,
+                        right: parseInt($(child.id).css('margin-right'))/options.density*child.data.force,
+                        bottom: parseInt($(child.id).css('margin-bottom'))/options.density*child.data.force,
+                        left: parseInt($(child.id).css('margin-left'))/options.density*child.data.force
+                    };
+                    group.data.gWidth += child.data.margin.left + child.data.width + child.data.margin.right;
+                    group.data.gHeight += child.data.margin.top + child.data.height + child.data.margin.bottom;
+                });
+
+                // console.log(group.data.gHeight);
+
+                var delta = 0;
+
+                group.data.center = {
+                    top: $(group.parent).offset().top+(group.data.gHeight/2),
+                    left: $(group.parent).offset().left+(group.data.gWidth/2) 
+                };
+
+                delta = {
+                    top: group.data.gravity.top - group.data.center.top,
+                    left: group.data.gravity.left - group.data.center.left
+                }
+
+
+                // calc vertical force
+                if(group.data.gHeight>=group.data.aHeight){
+                    group.data.padding = {
+                        top: 0
+                    };
+                }else if(group.data.gHeight<=group.data.aHeight-delta.top){
+                    group.data.padding = {
+                        top: delta.top - group.data.offset.top
+                    };
+                }else{
+                    group.data.padding = {
+                        top: group.data.aHeight - group.data.gHeight
+                    };
+                }
+
+                $(group.parent).css({
+                    'padding-top': group.data.padding.top
+                });
+
+
+                // apply to DOM
+                $.each(group.children, function(index,child){
+                    var m = $(child.id).outerHeight()*options.k;
+
+                    // calc text alignment force
+                    if($(child.id).css('text-align')=='start'){
+                        if(child.data.center.left<group.data.gravity.left/2){
+                            $(child.id).css('text-align','left');
+                        }else if(group.data.gravity.left<(child.data.center.left*3)/2){
+                            $(child.id).css('text-align','center');
+                        }else{
+                            $(child.id).css('text-align','right');
+                        }
+                    }
+
 
                     // apply deafult margin
-                    $(element).css({
-        	        	'margin-top': margin+'px',
-                        'margin-bottom': margin+'px'
+                    $(child.id).css({
+        	        	'margin-top': child.data.margin.top+'px',
+                        'margin-bottom': child.data.margin.bottom+'px',
+                        'margin-left': child.data.margin.left+'px',
+                        'margin-right': child.data.margin.right+'px'
                 	});
 
                     // if margin exceeds available container, reduce
-                    if(height+(margin*2)>ph){
-                        margin = (ph-height)/2;
-                        $(element).css({
+                    if(child.height+(m*2)>group.data.aHeight){
+                        margin = (group.data.aHeight-child.height)/2;
+                        $(child.id).css({
                             'margin-top': margin+'px',
                             'margin-bottom': margin+'px'
                         });
                     }
 
                     // if margin to bounds is less apply default
-                    if($(element).offset().left<margin){
-                        $(element).css({
-                            'margin-left': margin+'px'
-                        });
-                    }
+                    // if($(child.id).offset().left<m){
+                    //     $(child.id).css({
+                    //         'margin-left': m+'px'
+                    //     });
+                    // }
 
                 });
             });
-
-            console.log(this.options);
 
         },
 
@@ -284,8 +376,9 @@
         More: http://learn.jquery.com/plugins/advanced-plugin-concepts/
     */
     $.fn.gravity.defaults = {
+        gravitation: [{ name: 'g1', top: '50%', left: '50%' }],
         k: 0.618,
-        force: 10,
+        density: 10,
         elements: [],
         onComplete: null
     };

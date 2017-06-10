@@ -1,6 +1,15 @@
 /* style.css */
 
+body {
+    font-size: 17px;
+}
+
 .container {
     position: relative;
-    height: 70%;
+    height: 100%;
+
+}
+
+h1 {
+    font-size: 5rem;
 }
